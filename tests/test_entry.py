@@ -11,6 +11,35 @@ from deploy_test import Runner, Stopped, BattleEnded
 
 
 class EntryTests(unittest.TestCase):
+    def test_death_replay_interrupts_radar_open_and_recovers(self):
+        replay = np.array(open_capture('runs/20261113-140659/radar_attempt_1_7.png').convert('RGB'))
+        selection = np.array(open_capture(Path(tempfile.gettempdir()) /
+            'codex-clipboard-e71e56d8-0cbd-43b9-94bb-248f0d4ae940.png').convert('RGB'))
+        reader = EntryReader()
+        self.assertTrue(reader.destruction_replay(replay))
+        self.assertFalse(reader.destruction_replay(selection))
+        self.assertTrue(reader.selection(selection))
+        runner = Runner.__new__(Runner)
+        runner.monitor_battle = True
+        runner.battle_reader = reader
+        runner.wait = Mock()
+        runner.hotkey = Mock()
+        runner.snapshot = lambda name: runner.inspect_battle_frame(replay)
+        with self.assertRaises(BattleEnded):
+            runner.open_radar()
+        runner.hotkey.assert_not_called()
+        self.assertFalse(runner.monitor_battle)
+        runner.check = Mock()
+        runner.log = Mock()
+        runner.logdir = Path('runs')
+        runner.return_to_base = Mock()
+        with patch('deploy_test.EntryReader', return_value=reader), \
+             patch('deploy_test.ImageGrab.grab', side_effect=[Image.fromarray(f) for f in
+                   (replay, replay, selection, selection, selection)]), \
+             patch('deploy_test.Image.Image.save'):
+            runner.recover_battle_end()
+        runner.return_to_base.assert_called_once_with(reader)
+
     def test_tier_reward_then_research_then_matchmaking(self):
         root = Path(tempfile.gettempdir())
         keys = ['442927e4-5d21-42f7-8f0c-cee7c62ee75a',
@@ -48,6 +77,7 @@ class EntryTests(unittest.TestCase):
         reader = Mock()
         reader.results.return_value = False
         reader.destruction_countdown.return_value = False
+        reader.destruction_replay.return_value = False
         reader.selection.side_effect = [False, False, True, True, True]
         with patch('deploy_test.EntryReader', return_value=reader), \
              patch('deploy_test.ImageGrab.grab', return_value=Image.new('RGB', (1920,1080))), \

@@ -237,7 +237,8 @@ class Runner:
         if not hasattr(self, 'battle_reader'):
             self.battle_reader = EntryReader()
         if (self.battle_reader.selection(frame) or self.battle_reader.results(frame) or
-                self.battle_reader.destruction_countdown(frame)):
+                self.battle_reader.destruction_countdown(frame) or
+                self.battle_reader.destruction_replay(frame)):
             self.monitor_battle = False
             raise BattleEnded('Post-spawn selection/results detected; current operation interrupted')
 
@@ -373,7 +374,7 @@ class Runner:
                 Image.fromarray(frame).save(self.logdir / f'battle_recovery_{poll:03d}.png')
             if reader.results(frame):
                 return True
-            if reader.destruction_countdown(frame):
+            if reader.destruction_countdown(frame) or reader.destruction_replay(frame):
                 stable = 0
                 self.wait(.5)
                 continue

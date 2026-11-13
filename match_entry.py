@@ -16,7 +16,13 @@ class EntryReader:
                                        'completed_title', 'completed_ok', 'research_title', 'research_allocate',
                                        'hangar_join', 'hangar_tree', 'launch_system_destroyed', 'evacuation_countdown',
                                        'missing_vehicle', 'missing_vehicle_ok',
-                                       'tier_complete_title', 'tier_complete_ok')}
+                                       'tier_complete_title', 'tier_complete_ok',
+                                       'destroyed_banner', 'death_score')}
+
+    def destruction_replay(self, frame):
+        # Static labels only: exclude attacker identity, vehicle and score.
+        return (self.matches(frame, 'destroyed_banner', (720,30,970,80), .90) and
+                self.matches(frame, 'death_score', (890,975,1030,1030)))
 
     def tier_complete(self, frame):
         return (self.matches(frame, 'tier_complete_title', (550,168,890,208)) and
