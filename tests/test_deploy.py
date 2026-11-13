@@ -13,6 +13,24 @@ from deploy_test import smooth_motion, refined_offsets, BattleEnded
 
 
 class DeploymentTests(unittest.TestCase):
+    def test_terrain_rejection_keeps_ammo_placement_active(self):
+        root = Path('runs/20261113-141249')
+        for name in ('ammo_1_attempt_3_0', 'battle_recovery_timeout'):
+            frame = np.array(open_capture(root / (name + '.png')).convert('RGB'))
+            self.assertTrue(Runner.ammo_hint(frame))
+        self.assertFalse(Runner.ammo_hint(np.zeros((1080,1920,3), dtype=np.uint8)))
+
+    def test_ammo_mode_transient_miss_rechecks_without_click(self):
+        runner = Runner.__new__(Runner)
+        runner.ammo_hint = Mock(side_effect=[False, False, True])
+        runner.log = Mock()
+        runner.wait = Mock()
+        runner.snapshot = Mock()
+        runner.click = Mock()
+        self.assertTrue(runner.confirm_ammo_mode(None, 'ammo_1'))
+        self.assertEqual(runner.snapshot.call_count, 2)
+        runner.click.assert_not_called()
+
     def test_radar_panel_without_scan_circle(self):
         frame = np.array(open_capture(
             'runs/20261113-104850/battle_recovery_timeout.png').convert('RGB'))
@@ -46,7 +64,7 @@ class DeploymentTests(unittest.TestCase):
         runner.args = SimpleNamespace(search_step=900, pitch_step=600, look_down=1200)
         for name in ('check', 'wait', 'move_view', 'click', 'log'):
             setattr(runner, name, Mock())
-        runner.snapshot = Mock(side_effect=[before, after])
+        runner.snapshot = Mock(side_effect=[before] + [after] * 7)
         with self.assertRaises(BattleEnded):
             runner.attempt_ammo('ammo_2')
         runner.click.assert_not_called()
@@ -134,6 +152,8 @@ class DeploymentTests(unittest.TestCase):
 
     def test_ammo_does_not_click_outside_placement(self):
         runner = Runner.__new__(Runner)
+        runner.log = Mock()
+        runner.wait = Mock()
         runner.snapshot = Mock(return_value=None)
         runner.ammo_hint = Mock(return_value=False)
         runner.click = Mock()

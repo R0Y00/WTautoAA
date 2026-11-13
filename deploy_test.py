@@ -592,7 +592,23 @@ class Runner:
         template = cv2.imread(str(Path(__file__).parent / 'assets' / 'ammo_placement_hint.png'), 0)
         # Capture-point notifications can move the placement prompt upward.
         hint = cv2.cvtColor(frame[750:940,925:1115], cv2.COLOR_RGB2GRAY)
-        return bool(cv2.matchTemplate(hint, template, cv2.TM_CCOEFF_NORMED).max() >= .75)
+        if cv2.matchTemplate(hint, template, cv2.TM_CCOEFF_NORMED).max() >= .75:
+            return True
+        dim = cv2.imread(str(Path(__file__).parent / 'assets' / 'ammo_placement_hint_dim.png'), 0)
+        return bool(cv2.matchTemplate(hint, dim, cv2.TM_CCOEFF_NORMED).max() >= .85)
+
+    def confirm_ammo_mode(self, frame, name):
+        # Notifications can briefly dim/move the prompt. Recheck without input;
+        # wait/snapshot still perform the global death and F10 checks.
+        if self.ammo_hint(frame):
+            return True
+        self.log('ammo_mode_rechecking', object=name)
+        for poll in range(6):
+            self.wait(.2)
+            frame = self.snapshot(f'{name}_mode_recheck_{poll}')
+            if self.ammo_hint(frame):
+                return True
+        return False
 
     @staticmethod
     def ammo_icon(frame):
@@ -623,7 +639,7 @@ class Runner:
 
     def attempt_ammo(self, name):
         baseline = self.snapshot(name + '_icon_baseline')
-        if not self.ammo_hint(baseline):
+        if not self.confirm_ammo_mode(baseline, name):
             raise BattleEnded(f'{name}: placement mode absent; wait for possible vehicle-loss transition')
         for index, (dx, dy) in enumerate(self.placement_search(name)):
             self.check()
@@ -632,7 +648,7 @@ class Runner:
             self.settle(.4, .15)
             for attempt in range(2):
                 frame = self.snapshot(f'{name}_attempt_{index}_{attempt}')
-                if not self.ammo_hint(frame):
+                if not self.confirm_ammo_mode(frame, name):
                     raise BattleEnded(f'{name}: placement mode lost; wait for possible vehicle-loss transition')
                 self.click()
                 self.log('ammo_placement_attempt', object=name, candidate=index, attempt=attempt + 1)
@@ -647,7 +663,7 @@ class Runner:
                         return True
                     # No more clicks while the placement UI is absent; keep
                     # polling briefly to catch the transition into cooldown.
-                if not self.ammo_hint(frame):
+                if not self.confirm_ammo_mode(frame, name):
                     raise BattleEnded(f'{name}: placement closed without cooldown; wait for possible vehicle-loss transition')
         self.log('ammo_placement_unverified', object=name)
         return False
