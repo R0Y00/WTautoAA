@@ -245,7 +245,7 @@ class Runner:
     def recover_battle_end(self):
         self.monitor_battle = False
         self.log('battle_interrupted', message='Inputs stopped; waiting for destruction, selection or results transition')
-        if not self.handle_radar_loss():
+        if not self.handle_radar_loss(await_battle_end=True):
             raise Stopped('Battle-end screen was not confirmed; interrupted deployment will not resume')
 
     def wait(self, seconds):
@@ -363,7 +363,7 @@ class Runner:
                 if self.handle_radar_loss():
                     return
 
-    def handle_radar_loss(self):
+    def handle_radar_loss(self, await_battle_end=False):
         reader = EntryReader()
         self.log('radar_lost_waiting_for_selection')
         stable = 0
@@ -375,10 +375,11 @@ class Runner:
             if reader.results(frame):
                 return True
             if reader.destruction_countdown(frame) or reader.destruction_replay(frame):
+                await_battle_end = True
                 stable = 0
                 self.wait(.5)
                 continue
-            if radar_visible(frame):
+            if not await_battle_end and radar_visible(frame):
                 return False
             stable = stable + 1 if reader.selection(frame) else 0
             if stable >= 3:

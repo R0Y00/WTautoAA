@@ -11,6 +11,23 @@ from deploy_test import Runner, Stopped, BattleEnded
 
 
 class EntryTests(unittest.TestCase):
+    def test_confirmed_destruction_does_not_resume_on_residual_radar(self):
+        runner = Runner.__new__(Runner)
+        for name in ('check', 'wait', 'log', 'return_to_base'):
+            setattr(runner, name, Mock())
+        runner.logdir = Path('runs')
+        reader = Mock()
+        reader.results.return_value = False
+        reader.destruction_countdown.side_effect = [True, False, False, False, False]
+        reader.destruction_replay.return_value = False
+        reader.selection.side_effect = [False, True, True, True]
+        with patch('deploy_test.EntryReader', return_value=reader), \
+             patch('deploy_test.ImageGrab.grab', return_value=Image.new('RGB', (1920,1080))), \
+             patch('deploy_test.Image.Image.save'), \
+             patch('deploy_test.radar_visible', return_value=True):
+            self.assertTrue(runner.handle_radar_loss())
+        runner.return_to_base.assert_called_once_with(reader)
+
     def test_death_replay_interrupts_radar_open_and_recovers(self):
         replay = np.array(open_capture('runs/20261113-140659/radar_attempt_1_7.png').convert('RGB'))
         selection = np.array(open_capture(Path(tempfile.gettempdir()) /
