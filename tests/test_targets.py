@@ -10,6 +10,27 @@ from deploy_test import Runner
 
 
 class TargetTests(unittest.TestCase):
+    def test_changed_selection_cancels_pair_then_allows_reacquisition(self):
+        runner = Runner.__new__(Runner)
+        for name in ('check', 'right_double_click', 'wait', 'log'):
+            setattr(runner, name, Mock())
+        runner.logdir = Path('runs')
+        memory = TargetMemory()
+        memory.update([{'id': '15', 'starred': False}], 0)
+        reader = Mock()
+        reader.read.return_value = [{'id': '24', 'selected': True}]
+        with patch('deploy_test.ImageGrab.grab', return_value=Image.new('RGB', (1920,1080))), \
+             patch('deploy_test.radar_visible', return_value=True), \
+             patch('deploy_test.Image.Image.save') as save:
+            runner.fire_selected_pair('15', reader, memory)
+        self.assertEqual(runner.right_double_click.call_count, 1)
+        self.assertEqual(memory.seen['15']['shots'], 1)
+        save.assert_called_once()
+        # After the outer loop verifies selection again, finish the pending pair.
+        runner.fire_selected_pair('15', reader, memory)
+        self.assertEqual(runner.right_double_click.call_count, 2)
+        self.assertEqual(memory.seen['15']['shots'], 2)
+
     def test_unstarred_retries_immediately_but_fresh_star_blocks(self):
         memory = TargetMemory()
         row = {'id': '3', 'starred': False}

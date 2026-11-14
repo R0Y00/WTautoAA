@@ -497,7 +497,11 @@ class Runner:
                 raise RadarLost('Radar interface lost during selected target pair')
             selected = selected_target(reader.read(frame))
             if selected is not None and selected['id'] != target_id:
-                raise Stopped('Selected target changed during pair; second input cancelled')
+                Image.fromarray(frame).save(self.logdir / 'target_pair_selection_changed.png')
+                self.log('target_pair_cancelled', target_id=target_id,
+                         observed_id=selected['id'],
+                         reason='Selection changed; reacquire target in main loop')
+                return
             # A brief list dropout does not clear the already verified selection.
             # No cursor movement or left click between the two right-double-clicks.
 
